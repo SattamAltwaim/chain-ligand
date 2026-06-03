@@ -1,0 +1,14 @@
+{
+  "totalFrames": 10,
+  "chainPattern": "A_B",
+  "fixedResidue": {
+    "resName": "C",
+    "resNum": 105,
+    "chain": "A",
+    "label": "C105_A"
+  },
+  "jobId": "chainligand-demo",
+  "systemName": "C105_A \u2194 Chain B (7QDE)",
+  "jobCreatedAt": "2026-06-02T00:00:00Z",
+  "jobExpiresAt": "2027-06-02T00:00:00Z"
+}

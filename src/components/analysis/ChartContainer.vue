@@ -1,0 +1,112 @@
+<template>
+  <div id="chartContainer" class="chart-container">
+    <div v-if="loading" class="loading">
+      <div class="loading-spinner"></div>
+      <div>Loading chart data...</div>
+    </div>
+    <div v-else-if="error" class="error">
+      {{ error }}
+    </div>
+    <div v-else-if="!hasData" class="no-data">
+      No data available. Please select a system.
+    </div>
+    <template v-else>
+      <component
+        :is="currentChartComponent"
+        :key="chartKey"
+      />
+    </template>
+  </div>
+</template>
+
+<script setup>
+import { computed, ref, watch } from 'vue'
+import { useAnalysisStore } from '../../stores/analysisStore'
+import { useChartUiStore } from '../../stores/chartUiStore'
+import { useSystemsStore } from '../../stores/systemsStore'
+import FilteredHeatmap from '../charts/FilteredHeatmap.vue'
+import AreaChart from '../charts/AreaChart.vue'
+import InteractionTrends from '../charts/InteractionTrends.vue'
+import InteractionConservationMatrix from '../charts/InteractionConservationMatrix.vue'
+import DependencyWheel from '../charts/DependencyWheel.vue'
+import PolarConservation from '../charts/PolarConservation.vue'
+import ResidueRadar from '../charts/ResidueRadar.vue'
+
+const analysisStore = useAnalysisStore()
+const systemsStore = useSystemsStore()
+const chartUiStore = useChartUiStore()
+
+const chartKey = ref(0)
+
+const loading = computed(() => {
+  return analysisStore.loading.interactions ||
+         analysisStore.loading.area ||
+         analysisStore.loading.trends
+})
+
+const error = computed(() => {
+  return analysisStore.errors.interactions ||
+         analysisStore.errors.area ||
+         analysisStore.errors.trends
+})
+
+const hasData = computed(() => {
+  return systemsStore.currentSystem !== null
+})
+
+const chartComponents = {
+  filteredHeatmap: FilteredHeatmap,
+  area: AreaChart,
+  line: InteractionTrends,
+  interactionConservationMatrix: InteractionConservationMatrix,
+  dependencyWheel: DependencyWheel,
+  polarConservation: PolarConservation,
+  residueRadar: ResidueRadar
+}
+
+const currentChartComponent = computed(() => {
+  return chartComponents[chartUiStore.currentChartType] || FilteredHeatmap
+})
+
+// Force re-render when chart type or system changes
+// NOTE: Do NOT include chartUiStore.currentThreshold here — charts handle threshold
+// changes internally via their own watchers. Including it here would destroy and
+// re-create the component, resetting local state (e.g. type conservation threshold).
+watch([
+  () => chartUiStore.currentChartType,
+  () => systemsStore.currentSystem?.id
+], () => {
+  chartKey.value++
+})
+</script>
+
+<style scoped>
+.chart-container {
+  padding: 32px;
+}
+
+.loading,
+.error,
+.no-data {
+  text-align: center;
+  padding: 100px 20px;
+  color: #6e6e73;
+  font-size: 19px;
+}
+
+.loading-spinner {
+  display: inline-block;
+  width: 40px;
+  height: 40px;
+  border: 4px solid #d2d2d7;
+  border-top-color: #1d1d1f;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 20px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+</style>
+

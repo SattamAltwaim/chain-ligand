@@ -1,0 +1,59 @@
+import { createRouter, createWebHistory } from 'vue-router'
+import LandingPage from '../views/LandingPage.vue'
+import AnalysisView from '../views/AnalysisView.vue'
+import AboutPage from '../views/AboutPage.vue'
+import HelpPage from '../views/HelpPage.vue'
+import ReferencesPage from '../views/ReferencesPage.vue'
+import ExamplesPage from '../views/ExamplesPage.vue'
+import JobsPage from '../views/JobsPage.vue'
+
+const routes = [
+  {
+    path: '/',
+    name: 'Analysis',
+    component: AnalysisView
+  },
+  {
+    path: '/upload',
+    name: 'Landing',
+    component: LandingPage
+  },
+  {
+    path: '/analysis/:jobId',
+    name: 'AnalysisJob',
+    component: AnalysisView
+  },
+  {
+    path: '/jobs',
+    name: 'Jobs',
+    component: JobsPage
+  },
+  {
+    path: '/about',
+    name: 'About',
+    component: AboutPage
+  },
+  {
+    path: '/help',
+    name: 'Help',
+    component: HelpPage
+  },
+  {
+    path: '/references',
+    name: 'References',
+    component: ReferencesPage
+  },
+  {
+    path: '/examples',
+    name: 'Examples',
+    component: ExamplesPage
+  }
+]
+
+const router = createRouter({
+  history: createWebHistory('/'),
+  routes
+})
+
+export default router
+

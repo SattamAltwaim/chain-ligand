@@ -1,0 +1,514 @@
+<template>
+  <div class="advanced-settings">
+    <button 
+      type="button"
+      class="settings-toggle"
+      @click="isExpanded = !isExpanded"
+    >
+      <span class="toggle-icon" :class="{ expanded: isExpanded }">▸</span>
+      Advanced Settings
+    </button>
+    
+    <Transition name="slide">
+      <div v-if="isExpanded" class="settings-panel">
+        <!-- Job Name -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <span>Job Name</span>
+            <TooltipIcon text="Display name for this analysis. Shown in the jobs list and analysis views. Defaults to the PDB filename." />
+          </div>
+          <div class="setting-control full-width">
+            <input
+              type="text"
+              v-model="settings.jobName"
+              :placeholder="defaultJobName || 'e.g. my_trajectory'"
+              class="text-input job-name-input"
+            />
+          </div>
+        </div>
+
+        <!-- Email Address -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <span>Email Address</span>
+            <TooltipIcon text="Your email for this job." />
+          </div>
+          <div class="setting-control full-width">
+            <input
+              type="email"
+              v-model="settings.email"
+              placeholder="you@example.com"
+              class="text-input email-input"
+            />
+          </div>
+        </div>
+
+        <div class="setting-section-divider"></div>
+
+        <!-- Use Reduce Toggle -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <span>Use Reduce</span>
+            <TooltipIcon text="Enable hydrogen addition preprocessing using the Reduce tool. This adds missing hydrogen atoms to the structure before analysis. Slower but may improve accuracy for structures without hydrogens." />
+          </div>
+          <div class="setting-control">
+            <label class="toggle-switch">
+              <input 
+                type="checkbox" 
+                v-model="settings.useReduce"
+              />
+              <span class="toggle-slider"></span>
+            </label>
+            <span class="toggle-label">{{ settings.useReduce ? 'ON' : 'OFF' }}</span>
+          </div>
+        </div>
+
+        <!-- Time Unit -->
+        <div class="setting-row">
+          <div class="setting-label">
+            <span>Time Unit</span>
+            <TooltipIcon text="Optional label for the time axis in charts (e.g., 'ns', 'ps', 'μs'). Leave empty to show 'Frame' instead." />
+          </div>
+          <div class="setting-control">
+            <input 
+              type="text" 
+              v-model="settings.timeUnit"
+              placeholder="e.g., ns"
+              class="text-input"
+            />
+          </div>
+        </div>
+
+        <!-- Frame Selection Section (only shown when > maxFramesSlack) -->
+        <template v-if="totalFrames > maxFramesSlack">
+          <div class="setting-section-divider"></div>
+          <h4 class="setting-section-title">Frame Sampling</h4>
+          
+          <!-- Step Size -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Step Size</span>
+              <TooltipIcon :text="`Sample every Nth frame. Minimum ${minStepSize} to stay within the ${maxFramesSlack}-frame web limit. Disabled when using custom interval.`" />
+            </div>
+            <div class="setting-control">
+              <input 
+                type="number" 
+                v-model.number="settings.frameStep"
+                :min="minStepSize" 
+                :max="Math.ceil(totalFrames / 2)"
+                :disabled="settings.useCustomInterval"
+                class="number-input"
+                :class="{ disabled: settings.useCustomInterval }"
+                @change="clampStepSize"
+              />
+              <span class="unit">frames</span>
+            </div>
+          </div>
+
+          <!-- Effective Frames Display -->
+          <div class="setting-row info-row" v-if="!settings.useCustomInterval">
+            <div class="setting-label">
+              <span>Frames to Analyze</span>
+            </div>
+            <div class="setting-value" :class="{ 'value-warning': computedFrameCount > maxFramesSlack }">
+              {{ computedFrameCount }} frames (1 to {{ totalFrames }})
+            </div>
+          </div>
+
+          <!-- Use Custom Interval Toggle -->
+          <div class="setting-row">
+            <div class="setting-label">
+              <span>Use Custom Interval</span>
+              <TooltipIcon text="Switch to selecting a specific contiguous range of frames instead of sampling the entire trajectory." />
+            </div>
+            <div class="setting-control">
+              <label class="toggle-switch">
+                <input 
+                  type="checkbox" 
+                  v-model="settings.useCustomInterval"
+                />
+                <span class="toggle-slider"></span>
+              </label>
+              <span class="toggle-label">{{ settings.useCustomInterval ? 'ON' : 'OFF' }}</span>
+            </div>
+          </div>
+
+          <!-- Frame Interval Selector (shown when custom interval is enabled) -->
+          <div v-if="settings.useCustomInterval" class="interval-selector-wrapper">
+            <FrameIntervalSelector
+              :totalFrames="totalFrames"
+              :maxFrames="maxFramesSlack"
+              v-model="frameInterval"
+            />
+          </div>
+        </template>
+      </div>
+    </Transition>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, watch, computed } from 'vue'
+import TooltipIcon from './TooltipIcon.vue'
+import FrameIntervalSelector from './FrameIntervalSelector.vue'
+
+const emit = defineEmits(['update:settings'])
+
+const props = defineProps({
+  modelValue: {
+    type: Object,
+    default: () => ({
+      jobName: '',
+      email: '',
+      interfaceCutoff: 6.0,
+      waterCutoff: 5.0,
+      useReduce: false,
+      frameStep: 1,
+      useCustomInterval: false,
+      startFrame: 1,
+      endFrame: 50
+    })
+  },
+  defaultJobName: {
+    type: String,
+    default: ''
+  },
+  totalFrames: {
+    type: Number,
+    default: 0
+  },
+  maxFrames: {
+    type: Number,
+    default: 50
+  },
+  maxFramesSlack: {
+    type: Number,
+    default: 53
+  },
+  minStepSize: {
+    type: Number,
+    default: 1
+  }
+})
+
+const isExpanded = ref(false)
+
+const settings = reactive({
+  jobName: props.modelValue.jobName ?? '',
+  email: props.modelValue.email ?? '',
+  interfaceCutoff: props.modelValue.interfaceCutoff ?? 6.0,
+  waterCutoff: props.modelValue.waterCutoff ?? 5.0,
+  useReduce: props.modelValue.useReduce ?? false,
+  timeUnit: props.modelValue.timeUnit ?? '',
+  frameStep: props.modelValue.frameStep ?? 1,
+  useCustomInterval: props.modelValue.useCustomInterval ?? false,
+  startFrame: props.modelValue.startFrame ?? 1,
+  endFrame: props.modelValue.endFrame ?? 50
+})
+
+const computedFrameCount = computed(() => {
+  return Math.ceil(props.totalFrames / (settings.frameStep || 1))
+})
+
+const clampStepSize = () => {
+  if (settings.frameStep < props.minStepSize) {
+    settings.frameStep = props.minStepSize
+  }
+}
+
+// Frame interval for FrameIntervalSelector v-model
+const frameInterval = ref({
+  startFrame: settings.startFrame,
+  endFrame: Math.min(settings.endFrame, props.maxFramesSlack)
+})
+
+// Sync frameInterval changes back to settings
+watch(frameInterval, (newVal) => {
+  settings.startFrame = newVal.startFrame
+  settings.endFrame = newVal.endFrame
+}, { deep: true })
+
+// When defaultJobName (PDB stem) changes, set jobName to it so the field shows the default
+watch(() => props.defaultJobName, (stem) => {
+  if (stem !== undefined && stem !== null && stem !== '') {
+    settings.jobName = stem
+  }
+}, { immediate: true })
+
+// Watch for external settings updates (e.g., from parent)
+watch(() => props.modelValue, (newVal) => {
+  if (newVal.jobName !== undefined) settings.jobName = newVal.jobName
+  if (newVal.email !== undefined) settings.email = newVal.email
+  if (newVal.timeUnit !== undefined) settings.timeUnit = newVal.timeUnit
+  if (newVal.frameStep !== undefined) settings.frameStep = newVal.frameStep
+  if (newVal.useCustomInterval !== undefined) settings.useCustomInterval = newVal.useCustomInterval
+  if (newVal.startFrame !== undefined) settings.startFrame = newVal.startFrame
+  if (newVal.endFrame !== undefined) settings.endFrame = newVal.endFrame
+}, { deep: true })
+
+watch(settings, (newSettings) => {
+  emit('update:settings', { ...newSettings })
+}, { deep: true })
+</script>
+
+<style scoped>
+.advanced-settings {
+  margin-top: 24px;
+}
+
+.settings-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  padding: 12px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #1d1d1f;
+  cursor: pointer;
+  font-family: inherit;
+  transition: color 0.15s ease;
+}
+
+.settings-toggle:hover {
+  color: #0066cc;
+}
+
+.toggle-icon {
+  font-size: 12px;
+  transition: transform 0.2s ease;
+}
+
+.toggle-icon.expanded {
+  transform: rotate(90deg);
+}
+
+.settings-panel {
+  background: #f5f5f7;
+  border-radius: 12px;
+  padding: 20px 24px;
+  margin-top: 8px;
+}
+
+.setting-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 0;
+  border-bottom: 1px solid #e8e8ed;
+}
+
+.setting-row:last-child,
+.setting-row:has(+ .setting-section-divider) {
+  border-bottom: none;
+}
+
+.setting-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 500;
+  color: #1d1d1f;
+}
+
+.setting-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.number-input {
+  width: 80px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: right;
+  border: 2px solid #d2d2d7;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.number-input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.unit {
+  font-size: 15px;
+  font-weight: 500;
+  color: #6e6e73;
+  min-width: 20px;
+}
+
+.text-input {
+  width: 80px;
+  padding: 8px 12px;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: center;
+  border: 2px solid #d2d2d7;
+  border-radius: 8px;
+  background: #ffffff;
+  font-family: inherit;
+  transition: all 0.15s ease;
+}
+
+.setting-control.full-width {
+  flex: 1;
+  min-width: 0;
+}
+
+.job-name-input,
+.email-input {
+  width: 100%;
+  min-width: 180px;
+  text-align: left;
+}
+
+.text-input:focus {
+  outline: none;
+  border-color: #0066cc;
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+.text-input::placeholder {
+  color: #a1a1a6;
+  font-weight: 400;
+}
+
+/* Toggle Switch */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 48px;
+  height: 28px;
+  margin: 0;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #d2d2d7;
+  border-radius: 28px;
+  transition: all 0.3s ease;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 22px;
+  width: 22px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: #34c759;
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(20px);
+}
+
+.toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6e6e73;
+  min-width: 32px;
+}
+
+/* Transition */
+.slide-enter-active,
+.slide-leave-active {
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+.slide-enter-from,
+.slide-leave-to {
+  opacity: 0;
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  margin-top: 0;
+}
+
+.slide-enter-to,
+.slide-leave-from {
+  opacity: 1;
+  max-height: 800px;
+}
+
+/* Frame Sampling Section */
+.setting-section-divider {
+  height: 1px;
+  background: #d2d2d7;
+  margin: 16px 0;
+}
+
+.setting-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #6e6e73;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin: 0 0 12px 0;
+}
+
+.info-row {
+  background: #f0f7ff;
+  border-radius: 8px;
+  padding: 10px 14px;
+  margin: -4px 0 8px 0;
+}
+
+.setting-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0066cc;
+}
+
+.setting-value.value-warning {
+  color: #d32f2f;
+}
+
+.number-input.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.interval-selector-wrapper {
+  margin-top: 12px;
+}
+
+.interval-selector-wrapper :deep(.frame-selector) {
+  margin-top: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+}
+
+.interval-selector-wrapper :deep(.selector-title),
+.interval-selector-wrapper :deep(.selector-description) {
+  display: none;
+}
+</style>
