@@ -29,6 +29,7 @@ import AreaChart from '../charts/AreaChart.vue'
 import InteractionTrends from '../charts/InteractionTrends.vue'
 import InteractionConservationMatrix from '../charts/InteractionConservationMatrix.vue'
 import DependencyWheel from '../charts/DependencyWheel.vue'
+import InteractionSankey from '../charts/InteractionSankey.vue'
 import PolarConservation from '../charts/PolarConservation.vue'
 import ResidueRadar from '../charts/ResidueRadar.vue'
 
@@ -60,6 +61,7 @@ const chartComponents = {
   line: InteractionTrends,
   interactionConservationMatrix: InteractionConservationMatrix,
   dependencyWheel: DependencyWheel,
+  interactionSankey: InteractionSankey,
   polarConservation: PolarConservation,
   residueRadar: ResidueRadar
 }
@@ -109,4 +111,3 @@ watch([
   to { transform: rotate(360deg); }
 }
 </style>
-

@@ -42,6 +42,11 @@ const charts = [
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M5 7l14 10"/><path d="M5 17l14-10"/><path d="M12 3v18"/></svg>'
   },
   {
+    id: 'interactionSankey',
+    label: 'Sankey Diagram',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2.5" y="4" width="4" height="6" rx="1"/><rect x="10" y="9" width="4" height="6" rx="1"/><rect x="17.5" y="14" width="4" height="6" rx="1"/><path d="M6.5 7c2.5 0 1 5 3.5 5"/><path d="M14 12c2.5 0 1 5 3.5 5"/></svg>'
+  },
+  {
     id: 'polarConservation',
     label: 'Polar Fingerprint',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5" opacity="0.2" fill="currentColor"/><polygon points="12,2 22,8.5 22,15.5 12,22 2,15.5 2,8.5"/></svg>'
@@ -219,4 +224,3 @@ onMounted(() => {
   }
 }
 </style>
-
