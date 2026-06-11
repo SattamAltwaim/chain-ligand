@@ -22,6 +22,7 @@ const chartUiStore = useChartUiStore()
 const systemsStore = useSystemsStore()
 const chartContainer = ref(null)
 let chart = null
+const hiddenLegendTypes = new Set()
 
 const typeNodeId = (type) => `type:${type}`
 
@@ -40,29 +41,17 @@ const updateChart = () => {
 
   const links = []
   const nodes = new Map()
+  const availableTypes = new Set()
 
   for (const row of interactions) {
     const source = formatResidueId(row.resName1, row.resNum1, row.chain1)
     const target = formatResidueId(row.resName2, row.resNum2, row.chain2)
     if (!source || !target) continue
 
-    nodes.set(source, {
-      id: source,
-      name: source,
-      column: 0,
-      color: '#3B6EF5',
-      custom: { role: `Chain ${row.chain1} residue` }
-    })
-    nodes.set(target, {
-      id: target,
-      name: target,
-      column: 2,
-      color: '#8E8E93',
-      custom: { role: `Chain ${row.chain2} residue` }
-    })
-
     for (const type of row.typesArray || []) {
       if (!matchesSelectedTypes(type, chartUiStore.selectedInteractionTypes, INTERACTION_TYPES)) continue
+      availableTypes.add(type)
+      if (hiddenLegendTypes.has(type)) continue
 
       const persistence = row.typePersistence?.[type] ?? row.consistency ?? 0
       if (persistence <= 0) continue
@@ -78,6 +67,20 @@ const updateChart = () => {
         conservation: Math.round(persistence * 100)
       }
 
+      nodes.set(source, {
+        id: source,
+        name: source,
+        column: 0,
+        color: '#3B6EF5',
+        custom: { role: `Chain ${row.chain1} residue` }
+      })
+      nodes.set(target, {
+        id: target,
+        name: target,
+        column: 2,
+        color: '#8E8E93',
+        custom: { role: `Chain ${row.chain2} residue` }
+      })
       nodes.set(typeId, {
         id: typeId,
         name: type,
@@ -89,6 +92,10 @@ const updateChart = () => {
       links.push({ from: source, to: typeId, weight, color: linkColor, custom })
       links.push({ from: typeId, to: target, weight, color: linkColor, custom })
     }
+  }
+
+  for (const type of hiddenLegendTypes) {
+    if (!availableTypes.has(type)) hiddenLegendTypes.delete(type)
   }
 
   if (chart) chart.destroy()
@@ -110,28 +117,69 @@ const updateChart = () => {
       style: { fontSize: '14px', color: '#6e6e73' }
     },
     credits: { enabled: false },
-    series: [{
-      type: 'sankey',
-      name: 'Interaction flow',
-      data: links,
-      nodes: Array.from(nodes.values()),
-      nodeWidth: 24,
-      nodePadding: 16,
-      borderWidth: 0,
-      curveFactor: 0.45,
-      linkOpacity: 0.7,
-      minLinkWidth: 3,
-      dataLabels: {
-        enabled: true,
-        nodeFormat: '{point.name}',
-        style: {
-          fontSize: '11px',
-          fontWeight: '600',
-          color: '#1d1d1f',
-          textOutline: '2px rgba(255,255,255,0.9)'
+    legend: {
+      enabled: true,
+      align: 'right',
+      verticalAlign: 'middle',
+      layout: 'vertical',
+      itemStyle: { fontSize: '11px', fontWeight: '500', color: '#1d1d1f' },
+      itemHiddenStyle: { color: '#b6b6ba' },
+      symbolRadius: 6
+    },
+    plotOptions: {
+      series: {
+        events: {
+          legendItemClick: function () {
+            const type = this.options.custom?.interactionType
+            if (!type) return false
+
+            if (hiddenLegendTypes.has(type)) hiddenLegendTypes.delete(type)
+            else hiddenLegendTypes.add(type)
+
+            setTimeout(updateChart, 0)
+            return false
+          }
         }
       }
-    }],
+    },
+    series: [
+      {
+        type: 'sankey',
+        name: 'Interaction flow',
+        showInLegend: false,
+        data: links,
+        nodes: Array.from(nodes.values()),
+        nodeWidth: 24,
+        nodePadding: 16,
+        borderWidth: 0,
+        curveFactor: 0.45,
+        linkOpacity: 0.7,
+        minLinkWidth: 3,
+        dataLabels: {
+          enabled: true,
+          nodeFormat: '{point.name}',
+          style: {
+            fontSize: '11px',
+            fontWeight: '600',
+            color: '#1d1d1f',
+            textOutline: '2px rgba(255,255,255,0.9)'
+          }
+        }
+      },
+      ...[...availableTypes]
+        .sort((a, b) => a.localeCompare(b))
+        .map(type => ({
+          type: 'scatter',
+          name: type,
+          color: getInteractionBaseColor(type),
+          data: [],
+          showInLegend: true,
+          visible: !hiddenLegendTypes.has(type),
+          enableMouseTracking: false,
+          marker: { symbol: 'circle', radius: 6 },
+          custom: { interactionType: type }
+        }))
+    ],
     tooltip: {
       backgroundColor: 'rgba(255,255,255,0.98)',
       borderRadius: 12,
